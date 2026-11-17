@@ -97,4 +97,6 @@ function png(size: number, rgba: Uint8Array) {
 const dir = new URL('../icons/', import.meta.url);
 mkdirSync(dir, { recursive: true });
 for (const size of [16, 32, 48, 128]) writeFileSync(new URL(`icon-${size}.png`, dir), render(size));
+// Edge Add-ons listing logo (recommended 300x300)
+writeFileSync(new URL('../store/logo-300.png', import.meta.url), render(300));
 console.log('icons written');
