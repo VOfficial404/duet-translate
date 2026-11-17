@@ -738,8 +738,8 @@
       if (!text || text.length > 3000 || sel.rangeCount === 0) return;
       const anchor = sel.anchorNode?.nodeType === 1 ? sel.anchorNode : sel.anchorNode?.parentElement;
       if (!anchor || anchor.closest('input, textarea, [contenteditable=""], [contenteditable="true"]')) return;
-      const rects = sel.getRangeAt(0).getClientRects();
-      const rect = rects[rects.length - 1] || sel.getRangeAt(0).getBoundingClientRect();
+      // the whole selection's box: a bubble flipped above must clear every selected line
+      const rect = sel.getRangeAt(0).getBoundingClientRect();
       ui.showSelIcon(text, rect);
     }, 0);
   }, true);
