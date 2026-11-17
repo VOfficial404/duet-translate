@@ -16,9 +16,11 @@
 
 ![双语对照](store/screenshot-1-bilingual.png)
 
-| 仅显示译文 | 悬停翻译 + 划词翻译 |
+| 只看译文 | 工具栏弹窗：进度、样式预览、本站规则 |
 | --- | --- |
-| ![仅译文](store/screenshot-2-translation-only.png) | ![划词翻译](store/screenshot-3-selection.png) |
+| ![只看译文](store/screenshot-2-translation-only.png) | ![工具栏弹窗](store/screenshot-3-popup.png) |
+| **悬停翻译 + 划词翻译** | **设置：服务列表、预设、一键测试** |
+| ![划词翻译](store/screenshot-4-selection.png) | ![设置页](store/screenshot-5-options.png) |
 
 ## 功能
 
@@ -66,9 +68,7 @@
 | 翻译单个段落 | 鼠标停在段落上，按一下 `Ctrl` |
 | 输入框翻译 | 快速连按三次空格 |
 
-**接入 AI**：打开设置 → 翻译服务 → OpenAI 兼容接口，选一个服务商预设，填入 API Key，然后点 **测试当前服务**。
-
-<img src="store/screenshot-4-options.png" width="640" alt="设置页">
+**接入 AI**：打开设置 → 翻译服务 → OpenAI 兼容接口，点一个服务商（自动填好接口地址和模型），填入 API Key，再点 **测试**。没配置好时，弹窗顶部会直接提示。
 
 - 使用本地 Ollama 时 API Key 留空；如果测试返回 403，设置环境变量 `OLLAMA_ORIGINS=*` 后重启 Ollama。
 - 使用推理模型（o 系列、GPT-5、DeepSeek-R1）时 Temperature 留空。这类模型比较慢，网页翻译更推荐非推理的小模型。

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Duet Translate - 双语对照网页翻译",
   "short_name": "Duet 翻译",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "开源的双语对照网页翻译扩展：段落级双语对照、悬停翻译、划词翻译、输入框翻译，支持自带 OpenAI / Claude / Gemini / DeepSeek / Ollama 等 API。",
   "icons": {
     "16": "icons/icon-16.png",
