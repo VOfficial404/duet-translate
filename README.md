@@ -9,6 +9,7 @@
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 ![Manifest V3](https://img.shields.io/badge/manifest-v3-4f6ef7)
 ![Chrome | Edge | Firefox](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Firefox-supported-success)
+[![Edge Add-ons](https://img.shields.io/badge/Edge%20Add--ons-%E5%AE%89%E8%A3%85-0078d7)](https://microsoftedge.microsoft.com/addons/detail/elgmeeaglgkmgikeamdcafajifjnnegl)
 
 </div>
 
@@ -47,7 +48,7 @@
 
 ## 安装
 
-**Edge 扩展商店**：审核中，上架后会在这里放链接。
+**Edge 扩展商店（推荐）**：[点这里安装](https://microsoftedge.microsoft.com/addons/detail/elgmeeaglgkmgikeamdcafajifjnnegl)，以后会自动更新。
 
 **安装包（Chrome / Edge）**：适合进不了扩展商店，或者想直接下载安装的用户。
 
