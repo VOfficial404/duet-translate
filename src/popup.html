@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Duet Translate</title>
+  <link rel="stylesheet" href="ui.css">
+  <style>
+    body { width: 320px; padding: 14px 16px 12px; }
+    header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    header img { width: 22px; height: 22px; }
+    header h1 { font-size: 15px; flex: 1; }
+    header a { font-size: 12px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 2px 12px; }
+    .row > select { width: 150px; }
+    #toggle { width: 100%; height: 40px; margin: 12px 0 8px; font-size: 15px; font-weight: 600; }
+    #toggle.on { background: var(--card); color: var(--accent); }
+    .seg { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .seg button { padding: 5px 10px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+    .seg button.on { background: var(--accent); color: #fff; }
+    #site { font-weight: 600; word-break: break-all; }
+    #unsupported { padding: 18px 4px; text-align: center; color: var(--muted); }
+    footer { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="../icons/icon-48.png" alt="">
+    <h1>Duet Translate</h1>
+    <a href="#" id="options">设置</a>
+  </header>
+
+  <div class="card">
+    <div class="row"><span class="label">目标语言</span><select id="targetLang"></select></div>
+    <div class="row"><span class="label">翻译服务</span><select id="engine"></select></div>
+    <div class="row"><span class="label">显示</span>
+      <div class="seg" id="displayMode">
+        <button data-v="bilingual">双语对照</button><button data-v="translation">仅译文</button>
+      </div>
+    </div>
+    <div class="row"><span class="label">译文样式</span><select id="style"></select></div>
+  </div>
+
+  <div id="pageControls">
+    <button class="btn primary" id="toggle">翻译此页面</button>
+    <div class="card">
+      <div class="row"><span class="label">总是翻译 <span id="site"></span></span><label class="switch"><input type="checkbox" id="always"><span></span></label></div>
+      <div class="row"><span class="label">从不翻译此网站</span><label class="switch"><input type="checkbox" id="never"><span></span></label></div>
+    </div>
+  </div>
+  <div id="unsupported" hidden>此页面不支持翻译（浏览器内部页面或扩展商店）。<br>刷新普通网页后再试。</div>
+
+  <footer><span>Alt+A 翻译 · Alt+S 切换显示</span><span id="hoverHint"></span></footer>
+  <script src="defaults.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

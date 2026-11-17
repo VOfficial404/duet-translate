@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Duet Translate - 双语对照网页翻译",
+  "short_name": "Duet Translate",
+  "version": "0.1.0",
+  "description": "开源的双语对照网页翻译扩展：段落级双语对照、悬停翻译、划词翻译、输入框翻译，支持自带 OpenAI / Claude / Gemini / DeepSeek / Ollama 等 API。",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Duet Translate",
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "scripts": ["src/defaults.js", "src/background.js"]
+  },
+  "options_ui": {
+    "page": "src/options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/defaults.js", "src/content.js"],
+      "css": ["src/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["storage", "contextMenus"],
+  "host_permissions": ["<all_urls>"],
+  "commands": {
+    "toggle-page": {
+      "suggested_key": { "default": "Alt+A" },
+      "description": "翻译此页面 / 显示原文"
+    },
+    "toggle-display": {
+      "suggested_key": { "default": "Alt+S" },
+      "description": "切换 双语对照 / 仅译文"
+    }
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "duet-translate@VOfficial404.github.io",
+      "strict_min_version": "121.0"
+    }
+  }
+}
