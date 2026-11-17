@@ -1,7 +1,7 @@
 /* Injected into every page. Kept minimal so translations inherit the page's own typography. */
 
 :root {
-  --duet-color: #4f6ef7;
+  --duet-color: #3f56e0;
 }
 
 font.duet-wrapper.duet-block {
@@ -35,33 +35,32 @@ font.duet-loading {
 
 font.duet-error {
   margin-left: 0.35em;
-  padding: 0 0.4em;
-  border-radius: 4px;
-  font-size: 0.8em;
-  color: #e03131;
-  background: rgba(224, 49, 49, 0.1);
+  font-size: clamp(12px, 0.8em, 14px);
+  color: #c2382f;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
   cursor: pointer;
   white-space: nowrap;
 }
 
-/* ---- translation styles (html[data-duet-style] is set by content.js) ---- */
+/* ---- translation styles: content.js sets data-duet-style on <html>; extension pages set it on preview elements ---- */
 
-html[data-duet-style='underline'] .duet-inner {
+[data-duet-style='underline'] .duet-inner {
   text-decoration: underline 2px var(--duet-color) !important;
   text-underline-offset: 0.28em;
 }
 
-html[data-duet-style='dashed'] .duet-inner {
+[data-duet-style='dashed'] .duet-inner {
   text-decoration: underline dashed 1.5px var(--duet-color) !important;
   text-underline-offset: 0.28em;
 }
 
-html[data-duet-style='wavy'] .duet-inner {
+[data-duet-style='wavy'] .duet-inner {
   text-decoration: underline wavy 1px var(--duet-color) !important;
   text-underline-offset: 0.3em;
 }
 
-html[data-duet-style='highlight'] .duet-inner {
+[data-duet-style='highlight'] .duet-inner {
   padding: 0 0.15em;
   border-radius: 3px;
   background: color-mix(in srgb, var(--duet-color) 14%, transparent);
@@ -69,30 +68,30 @@ html[data-duet-style='highlight'] .duet-inner {
   box-decoration-break: clone;
 }
 
-html[data-duet-style='marker'] .duet-inner {
+[data-duet-style='marker'] .duet-inner {
   background: linear-gradient(transparent 58%, color-mix(in srgb, var(--duet-color) 32%, transparent) 0);
 }
 
-html[data-duet-style='sideline'] .duet-block .duet-inner {
+[data-duet-style='sideline'] .duet-block .duet-inner {
   display: block;
   margin: 0.2em 0;
   padding-left: 0.6em;
   border-left: 3px solid var(--duet-color);
 }
 
-html[data-duet-style='dim'] .duet-inner {
+[data-duet-style='dim'] .duet-inner {
   opacity: 0.62;
 }
 
-html[data-duet-style='italic'] .duet-inner {
+[data-duet-style='italic'] .duet-inner {
   font-style: italic;
 }
 
-html[data-duet-style='blur'] .duet-inner {
+[data-duet-style='blur'] .duet-inner {
   filter: blur(5px);
   transition: filter 0.2s;
 }
 
-html[data-duet-style='blur'] .duet-inner:hover {
+[data-duet-style='blur'] .duet-inner:hover {
   filter: none;
 }

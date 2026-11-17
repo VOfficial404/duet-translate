@@ -1,77 +1,126 @@
 const $ = (id) => document.getElementById(id);
 
-const fill = (select, options) => {
-  select.replaceChildren(...options.map(([value, label]) => new Option(label, value)));
+// Sample translation of the preview sentence, per target language.
+const SAMPLE = {
+  'zh-CN': '并排阅读两种语言，会让你以一种好的方式慢下来。',
+  'zh-TW': '並排閱讀兩種語言，會讓你以一種好的方式慢下來。',
+  ja: '二つの言語を並べて読むと、いい意味でゆっくりになる。',
+  ko: '두 언어를 나란히 읽으면 좋은 의미로 속도가 느려진다.',
+  fr: 'Lire deux langues côte à côte vous ralentit, dans le bon sens.',
+  de: 'Zwei Sprachen nebeneinander zu lesen, bremst einen auf gute Weise.',
+  es: 'Leer dos idiomas uno al lado del otro te frena de buena manera.',
+  ru: 'Чтение двух языков бок о бок замедляет вас — в хорошем смысле.',
 };
+const HOVER_KEY = { Control: 'Ctrl', Alt: 'Alt', Shift: 'Shift' };
 
-const HOVER_LABEL = { Control: 'Ctrl', Alt: 'Alt', Shift: 'Shift' };
+let settings;
+let tab;
+let state = null;
 
-async function main() {
-  let settings = await DUET.loadSettings();
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+const send = (msg) => chrome.tabs.sendMessage(tab.id, msg).catch(() => null);
+const save = async (patch) => { settings = await DUET.saveSettings(patch); render(); };
 
-  fill($('targetLang'), DUET.LANGUAGES.map(([code, name]) => [code, name]));
-  fill($('engine'), Object.entries(DUET.ENGINES).map(([id, e]) => [id, e.name]));
-  fill($('style'), DUET.STYLES);
+function siteRule() {
+  if (DUET.hostMatches(state.host, settings.alwaysSites)) return 'always';
+  if (DUET.hostMatches(state.host, settings.neverSites)) return 'never';
+  return 'default';
+}
 
-  const render = () => {
-    $('targetLang').value = settings.targetLang;
-    $('engine').value = settings.engine;
-    $('style').value = settings.style;
-    for (const b of $('displayMode').children) b.classList.toggle('on', b.dataset.v === settings.displayMode);
-    const hover = HOVER_LABEL[settings.hoverKey];
-    $('hoverHint').textContent = hover ? `悬停按 ${hover} 翻译段落` : '';
-  };
-  render();
+function render() {
+  $('targetLang').value = settings.targetLang;
+  $('engine').value = settings.engine;
+  document.querySelector(`[name=displayMode][value=${settings.displayMode}]`).checked = true;
+  document.querySelector(`[name=style][value=${settings.style}]`).checked = true;
 
-  const save = async (patch) => { settings = await DUET.saveSettings(patch); render(); };
-  for (const key of ['targetLang', 'engine', 'style']) $(key).addEventListener('change', (e) => save({ [key]: e.target.value }));
-  $('displayMode').addEventListener('click', (e) => { if (e.target.dataset.v) save({ displayMode: e.target.dataset.v }); });
-  $('options').addEventListener('click', (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); window.close(); });
+  const preview = $('preview');
+  preview.dataset.duetStyle = settings.style;
+  preview.dataset.display = settings.displayMode;
+  preview.style.setProperty('--duet-color', settings.color);
+  document.documentElement.style.setProperty('--accent', settings.color);
+  $('previewText').textContent = SAMPLE[settings.targetLang] || SAMPLE['zh-CN'];
 
-  let state = null;
-  try {
-    state = await chrome.tabs.sendMessage(tab.id, { type: 'getState' });
-  } catch { /* no content script on this page */ }
+  const problem = DUET.engineProblem(settings);
+  $('engineNotice').hidden = !problem;
+  $('engineProblem').textContent = `${DUET.ENGINES[settings.engine].name} ${problem}`;
+
+  const hover = HOVER_KEY[settings.hoverKey];
+  $('hoverHint').innerHTML = hover ? `<kbd>${hover}</kbd> 翻译鼠标下的段落` : '';
+  renderPage();
+}
+
+function renderPage() {
+  const toggle = $('toggle');
   if (!state) {
-    $('pageControls').hidden = true;
-    $('unsupported').hidden = false;
+    toggle.disabled = true;
+    $('status').textContent = '这个页面不能翻译，浏览器内部页面和扩展商店会限制扩展运行';
+    $('siteRow').hidden = true;
     return;
   }
+  $('site').textContent = state.host;
+  toggle.disabled = false;
+  toggle.textContent = state.active ? '显示原文' : '翻译此页';
+  toggle.classList.toggle('on', state.active);
+  document.querySelector(`[name=siteRule][value=${siteRule()}]`).checked = true;
 
-  const host = state.host;
-  const renderPage = () => {
-    $('toggle').textContent = state.active ? '显示原文' : '翻译此页面';
-    $('toggle').classList.toggle('on', state.active);
-    $('site').textContent = host;
-    $('always').checked = DUET.hostMatches(host, settings.alwaysSites);
-    $('never').checked = DUET.hostMatches(host, settings.neverSites);
-  };
+  const status = $('status');
+  status.replaceChildren();
+  const text = document.createElement('span');
+  if (state.pending) text.textContent = `正在翻译 ${state.pending} 段，已完成 ${state.done} 段`;
+  else if (state.active || state.done) text.textContent = `已翻译 ${state.done} 段`;
+  else text.textContent = '只翻译你看到的部分，向下滚动时会继续翻译';
+  status.append(text);
+  if (state.failed) {
+    const err = document.createElement('span');
+    err.className = 'err';
+    err.title = state.error || '';
+    err.textContent = `${state.failed} 段失败`;
+    const retry = document.createElement('button');
+    retry.textContent = '重试';
+    retry.addEventListener('click', async () => { state = (await send({ type: 'retryFailed' })) || state; renderPage(); });
+    const right = document.createElement('span');
+    right.append(err, ' ', retry);
+    status.append(right);
+  }
+}
+
+async function main() {
+  settings = await DUET.loadSettings();
+  [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+  $('targetLang').replaceChildren(...DUET.LANGUAGES.map(([code, name]) => new Option(name, code)));
+  $('engine').replaceChildren(...Object.entries(DUET.ENGINES).map(([id, e]) =>
+    new Option(DUET.engineProblem(settings, id) ? `${e.name}（未配置）` : e.name, id)));
+  $('styles').innerHTML = DUET.STYLES.map(([value, name]) =>
+    `<label title="${name}"><input type="radio" name="style" value="${value}"><span class="chip" data-duet-style="${value}"><font class="duet-block"><font class="duet-inner">${name}</font></font></span></label>`).join('');
+
+  $('targetLang').addEventListener('change', (e) => save({ targetLang: e.target.value }));
+  $('engine').addEventListener('change', (e) => save({ engine: e.target.value }));
+  document.addEventListener('change', (e) => {
+    const { name, value } = e.target;
+    if (name === 'displayMode' || name === 'style') save({ [name]: value });
+    if (name === 'siteRule') setSiteRule(value);
+  });
+  const openOptions = (hash) => { chrome.tabs.create({ url: chrome.runtime.getURL(`src/options.html${hash}`) }); window.close(); };
+  $('options').addEventListener('click', () => openOptions(''));
+  $('fixEngine').addEventListener('click', (e) => { e.preventDefault(); openOptions('#engine'); });
+  $('toggle').addEventListener('click', async () => { state = (await send({ type: 'toggle' })) || state; renderPage(); });
+
+  state = await send({ type: 'getState' });
+  render();
+  // live progress while the popup is open
+  if (state) setInterval(async () => { state = (await send({ type: 'getState' })) || state; renderPage(); }, 600);
+}
+
+async function setSiteRule(rule) {
+  const others = (list) => list.filter((h) => !DUET.hostMatches(state.host, [h]));
+  const alwaysSites = others(settings.alwaysSites);
+  const neverSites = others(settings.neverSites);
+  if (rule === 'always') alwaysSites.push(state.host);
+  if (rule === 'never') neverSites.push(state.host);
+  await save({ alwaysSites, neverSites });
+  if (rule === 'always' && !state.active) state = (await send({ type: 'start' })) || state;
+  if (rule === 'never' && state.active) state = (await send({ type: 'stop' })) || state;
   renderPage();
-
-  $('toggle').addEventListener('click', async () => {
-    state = await chrome.tabs.sendMessage(tab.id, { type: 'toggle' });
-    renderPage();
-  });
-
-  const setList = (name, on) => {
-    const list = settings[name].filter((h) => !DUET.hostMatches(host, [h]));
-    return on ? [...list, host] : list;
-  };
-  $('always').addEventListener('change', async (e) => {
-    const patch = { alwaysSites: setList('alwaysSites', e.target.checked) };
-    if (e.target.checked) patch.neverSites = setList('neverSites', false);
-    await save(patch);
-    if (e.target.checked && !state.active) state = await chrome.tabs.sendMessage(tab.id, { type: 'start' });
-    renderPage();
-  });
-  $('never').addEventListener('change', async (e) => {
-    const patch = { neverSites: setList('neverSites', e.target.checked) };
-    if (e.target.checked) patch.alwaysSites = setList('alwaysSites', false);
-    await save(patch);
-    if (e.target.checked && state.active) state = await chrome.tabs.sendMessage(tab.id, { type: 'stop' });
-    renderPage();
-  });
 }
 
 main();

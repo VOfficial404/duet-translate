@@ -276,7 +276,7 @@
     const btn = document.createElement('font');
     btn.className = 'duet-error';
     btn.title = `${message}\n点击重试`;
-    btn.textContent = '翻译失败 ↻';
+    btn.textContent = '翻译失败，点击重试';
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -332,6 +332,30 @@
   function settle() {
     pending = Math.max(0, pending - 1);
     ui?.update();
+  }
+
+  function stats() {
+    let done = 0;
+    let failed = 0;
+    for (const u of units) {
+      if (u.status === 'done' && u.translation) done++;
+      else if (u.status === 'error') failed++;
+    }
+    return { done, failed, pending };
+  }
+
+  function retryFailed() {
+    lastError = '';
+    for (const u of units) {
+      if (u.status === 'error') { u.status = null; enqueue(u); }
+    }
+  }
+
+  // One notice per failure burst instead of one per paragraph.
+  let lastError = '';
+  function reportError(message) {
+    lastError = message;
+    ui?.toast(message, 'error', { label: '全部重试', run: retryFailed });
   }
 
   async function translateTexts(texts, to) {
@@ -392,6 +416,7 @@
     } catch (e) {
       error = e.message;
     }
+    let failed = false;
     texts.forEach((text, i) => {
       for (const u of groups.get(text)) {
         if (u.dead) { settle(); continue; }
@@ -403,10 +428,11 @@
           u.status = 'error';
           renderError(u, error || '翻译结果为空');
           settle();
-          ui?.toast(error || '部分段落翻译失败');
+          failed = true;
         }
       }
     });
+    if (failed && myGen === gen) reportError(error || '部分段落没有返回译文');
   }
 
   const normalize = (s) => s.replace(/\s+/g, '').toLowerCase();
@@ -462,6 +488,8 @@
     queue = [];
     for (const u of [...units]) destroy(u);
     pending = 0;
+    lastError = '';
+    ui?.toast('');
     ui?.update();
   }
 
@@ -612,46 +640,55 @@
     hostEl.style.cssText = 'all:initial;position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;';
     const root = hostEl.attachShadow({ mode: 'open' });
     root.innerHTML = `<style>${UI_CSS}</style>
-      <div class="ball-wrap" part="ball">
-        <div class="menu">
-          <button data-act="display" title="切换 双语对照 / 仅译文"></button>
-          <button data-act="options" title="设置">${ICON_GEAR}</button>
-          <button data-act="hide" title="在本页隐藏悬浮球">${ICON_CLOSE}</button>
-        </div>
-        <button class="ball" title="翻译此页面 (Alt+A)">${ICON_LOGO}<span class="ring"></span></button>
+      <div class="dock">
+        <div class="panel"><div class="panel-inner" role="menu">
+          <p class="status"></p>
+          <button class="row" data-act="display" role="menuitem"><span class="ico"></span><span class="label"></span></button>
+          <button class="row" data-act="options" role="menuitem"><span class="ico">${ICON_GEAR}</span><span class="label">打开设置</span></button>
+          <button class="row" data-act="hide" role="menuitem"><span class="ico">${ICON_HIDE}</span><span class="label">在此页隐藏按钮</span></button>
+        </div></div>
+        <button class="ball">${ICON_DUET}<span class="dot"></span></button>
       </div>
-      <div class="toast" hidden></div>
-      <button class="sel-icon" hidden title="翻译选中文本">${ICON_LOGO}</button>
-      <div class="bubble" hidden><div class="bubble-body"></div><div class="bubble-foot"><span class="engine"></span><button data-act="copy">复制</button></div></div>`;
+      <div class="toast" role="status" hidden>
+        <span class="toast-text"></span>
+        <button class="toast-action" data-act="toast-action"></button>
+        <button class="toast-close" data-act="toast-close" aria-label="关闭">${ICON_CLOSE}</button>
+      </div>
+      <button class="sel-icon" hidden aria-label="翻译选中文字" title="翻译选中文字">${ICON_DUET}</button>
+      <div class="bubble" hidden>
+        <div class="bubble-body"></div>
+        <div class="bubble-foot"><span class="engine"></span><button class="copy" data-act="copy">${ICON_COPY}<span>复制</span></button></div>
+      </div>`;
     const $ = (s) => root.querySelector(s);
-    const wrap = $('.ball-wrap');
+    const dock = $('.dock');
     const ball = $('.ball');
     const toastEl = $('.toast');
     const selIcon = $('.sel-icon');
     const bubble = $('.bubble');
     let hiddenForPage = false;
     let toastTimer = 0;
+    let toastAction = null;
 
-    // vertical drag
+    // vertical drag; a press without movement toggles the page
     let drag = null;
     ball.addEventListener('pointerdown', (e) => {
-      drag = { y: e.clientY, top: wrap.getBoundingClientRect().top, moved: false };
+      const r = dock.getBoundingClientRect();
+      drag = { y: e.clientY, center: r.top + r.height / 2, moved: false };
       ball.setPointerCapture(e.pointerId);
     });
     ball.addEventListener('pointermove', (e) => {
       if (!drag) return;
       const dy = e.clientY - drag.y;
       if (Math.abs(dy) > 4) drag.moved = true;
-      if (drag.moved) wrap.style.top = `${Math.min(innerHeight - 60, Math.max(8, drag.top + dy))}px`;
+      if (drag.moved) dock.style.top = `${Math.min(innerHeight - 28, Math.max(28, drag.center + dy))}px`;
     });
     ball.addEventListener('pointerup', () => {
       if (!drag) return;
       const { moved } = drag;
       drag = null;
-      if (moved) {
-        const pct = Math.round((wrap.getBoundingClientRect().top / innerHeight) * 100);
-        DUET.saveSettings({ ballTop: pct });
-      } else togglePage();
+      if (!moved) { togglePage(); return; }
+      const r = dock.getBoundingClientRect();
+      DUET.saveSettings({ ballTop: Math.round(((r.top + r.height / 2) / innerHeight) * 100) });
     });
 
     root.addEventListener('click', (e) => {
@@ -659,26 +696,45 @@
       if (act === 'display') DUET.saveSettings({ displayMode: settings.displayMode === 'translation' ? 'bilingual' : 'translation' });
       if (act === 'options') chrome.runtime.sendMessage({ type: 'openOptions' });
       if (act === 'hide') { hiddenForPage = true; update(); }
-      if (act === 'copy') navigator.clipboard.writeText($('.bubble-body').textContent).then(() => toast('已复制', 'info'));
+      if (act === 'copy') navigator.clipboard.writeText($('.bubble-body').textContent).then(() => toast('已复制译文', 'info'));
+      if (act === 'toast-close') toast('');
+      if (act === 'toast-action') { const run = toastAction; toast(''); run?.(); }
     });
 
-    function update() {
-      wrap.hidden = hiddenForPage || !settings.floatBall;
-      wrap.style.top = `${settings.ballTop}%`;
-      wrap.classList.toggle('active', active);
-      wrap.classList.toggle('busy', pending > 0);
-      ball.title = active ? '显示原文 (Alt+A)' : '翻译此页面 (Alt+A)';
-      $('[data-act="display"]').innerHTML = settings.displayMode === 'translation' ? '译' : '双';
+    let frame = 0;
+    const update = () => { frame ||= requestAnimationFrame(render); };
+    function render() {
+      frame = 0;
+      const s = stats();
+      const only = settings.displayMode === 'translation';
+      dock.hidden = hiddenForPage || !settings.floatBall;
+      dock.style.top = `${settings.ballTop}%`;
+      dock.classList.toggle('active', active);
+      dock.classList.toggle('busy', s.pending > 0);
+      dock.classList.toggle('failed', s.failed > 0);
+      const label = active ? '显示原文（Alt+A）' : '翻译此页（Alt+A）';
+      ball.title = label;
+      ball.setAttribute('aria-label', label);
+      let status = '点击按钮翻译此页';
+      if (s.pending) status = `正在翻译 ${s.pending} 段`;
+      else if (active || s.done) status = `已翻译 ${s.done} 段`;
+      if (s.failed) status += `，${s.failed} 段失败`;
+      $('.status').textContent = status;
+      $('[data-act="display"] .ico').innerHTML = only ? ICON_DUET : ICON_ONLY;
+      $('[data-act="display"] .label').textContent = only ? '改为双语对照' : '改为只显示译文';
       hostEl.style.setProperty('--accent', settings.color);
     }
 
-    function toast(msg, kind = 'error') {
+    function toast(msg, kind = 'error', action) {
       clearTimeout(toastTimer);
-      if (kind === 'hide' || !msg) { toastEl.hidden = true; return; }
-      toastEl.textContent = msg;
+      if (!msg) { toastEl.hidden = true; return; }
       toastEl.className = `toast ${kind}`;
+      $('.toast-text').textContent = msg;
+      toastAction = action?.run || null;
+      $('.toast-action').hidden = !action;
+      $('.toast-action').textContent = action?.label || '';
       toastEl.hidden = false;
-      toastTimer = setTimeout(() => { toastEl.hidden = true; }, kind === 'error' ? 6000 : 2500);
+      toastTimer = setTimeout(() => { toastEl.hidden = true; }, kind === 'error' ? 10000 : 2500);
     }
 
     // selection translation
@@ -688,7 +744,7 @@
       el.hidden = false;
       const w = el.offsetWidth;
       const h = el.offsetHeight;
-      let x = Math.min(innerWidth - w - 8, Math.max(8, rect.right - w / 2));
+      const x = Math.min(innerWidth - w - 8, Math.max(8, rect.right - w / 2));
       let y = rect.bottom + 8;
       if (y + h > innerHeight - 8) y = Math.max(8, rect.top - h - 8);
       el.style.left = `${x}px`;
@@ -702,19 +758,20 @@
     async function showBubble(text, rect) {
       selIcon.hidden = true;
       const body = $('.bubble-body');
-      body.textContent = '翻译中…';
-      body.classList.add('loading');
+      const anchor = rect || { left: innerWidth / 2, right: innerWidth / 2, top: 80, bottom: 80 };
+      body.innerHTML = '<span class="skel"></span><span class="skel short"></span>';
+      $('.copy').hidden = true;
       $('.engine').textContent = DUET.ENGINES[settings.engine]?.name || '';
-      placeNear(bubble, rect || { left: innerWidth / 2, right: innerWidth / 2, top: 80, bottom: 80 });
+      placeNear(bubble, anchor);
       const to = scriptMatchesTarget(text, settings.targetLang) === 'yes' ? settings.inputTargetLang : settings.targetLang;
       try {
         const [result] = await translateTexts([text], to);
-        body.textContent = result || '（无结果）';
+        body.textContent = result || '没有返回译文';
+        $('.copy').hidden = !result;
       } catch (e) {
         body.textContent = `翻译失败：${e.message}`;
       }
-      body.classList.remove('loading');
-      placeNear(bubble, rect || { left: innerWidth / 2, right: innerWidth / 2, top: 80, bottom: 80 });
+      placeNear(bubble, anchor);
     }
     selIcon.addEventListener('click', () => showBubble(selText, selRect));
     const hidePopups = () => { selIcon.hidden = true; bubble.hidden = true; };
@@ -725,7 +782,7 @@
     document.documentElement.appendChild(hostEl);
     // some SPAs replace <html> children; keep the UI attached
     setInterval(() => { if (!hostEl.isConnected) document.documentElement.appendChild(hostEl); }, 2000);
-    update();
+    render();
     return { update, toast, showSelIcon, showBubble, host: hostEl };
   }
 
@@ -761,8 +818,9 @@
         ui?.showBubble(msg.text, rect);
         break;
       }
+      case 'retryFailed': retryFailed(); break;
     }
-    sendResponse({ active, displayMode: settings.displayMode, host });
+    sendResponse({ active, displayMode: settings.displayMode, host, ...stats(), error: lastError });
     return false;
   });
 
@@ -800,49 +858,100 @@
 
   /* ================= UI assets ================= */
 
-  const ICON_LOGO = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6.5h9M4 11h6"/><path d="M11 14.5h9M14 19h6" opacity=".55"/><path d="M17 3.5v5M14.5 6l2.5 2.5L19.5 6"/></svg>';
-  const ICON_GEAR = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
-  const ICON_CLOSE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  // The logo's mark: an original line and a lighter translated line beneath it.
+  const ICON_DUET = '<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M4 10h7"/><path d="M8 14.5h8" opacity=".5"/></svg>';
+  const ICON_ONLY = '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h12M4 12.5h8"/></svg>';
+  const ICON_GEAR = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.8l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.8v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const ICON_HIDE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.7 5.1A10 10 0 0 1 22 12a13 13 0 0 1-1.7 2.7M6.6 6.6A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"/></svg>';
+  const ICON_CLOSE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const ICON_COPY = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"/></svg>';
 
   const UI_CSS = `
-    /* the host carries all:initial inline, which beats :host rules, so typography goes on the top-level boxes */
-    :host { --accent: #4f6ef7; }
-    .ball-wrap, .toast, .sel-icon, .bubble { font: 13px/1.5 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2329; }
-    [hidden] { display: none !important; }
-    button { font: inherit; cursor: pointer; border: 0; padding: 0; background: none; color: inherit; }
-    .ball-wrap { position: fixed; right: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; transform: translateY(-40px); }
-    .ball { position: relative; width: 46px; height: 40px; border-radius: 20px 0 0 20px; background: #fff; color: var(--accent);
-      box-shadow: 0 2px 10px rgba(0,0,0,.16); display: grid; place-items: center; padding-right: 4px; touch-action: none;
-      transform: translateX(8px); transition: transform .18s, background .18s, color .18s; }
-    .ball-wrap:hover .ball { transform: translateX(0); }
-    .active .ball { background: var(--accent); color: #fff; }
-    .ring { position: absolute; left: 7px; top: 4px; width: 32px; height: 32px; box-sizing: border-box; border-radius: 50%;
-      border: 2px solid currentColor; border-right-color: transparent; opacity: 0; }
-    .busy .ring { opacity: .7; animation: spin .9s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .menu { display: flex; flex-direction: column; gap: 6px; margin-right: 6px; opacity: 0; pointer-events: none; transform: translateY(6px); transition: .15s; }
-    .ball-wrap:hover .menu { opacity: 1; pointer-events: auto; transform: none; }
-    .menu button { width: 30px; height: 30px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.15);
-      display: grid; place-items: center; color: #555; font-weight: 600; font-size: 13px; }
-    .menu button:hover { color: var(--accent); }
-    .toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); max-width: min(560px, 90vw); padding: 8px 14px;
-      border-radius: 8px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,.18); border-left: 4px solid #e03131; white-space: pre-wrap; word-break: break-word; }
-    .toast.info { border-left-color: var(--accent); }
-    .sel-icon { position: fixed; width: 28px; height: 28px; border-radius: 8px; background: #fff; color: var(--accent);
-      box-shadow: 0 2px 8px rgba(0,0,0,.2); display: grid; place-items: center; }
-    .sel-icon svg { width: 18px; height: 18px; }
-    .bubble { position: fixed; width: max-content; max-width: min(420px, 90vw); max-height: 50vh; overflow: auto; background: #fff;
-      border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.2); padding: 12px 14px 8px; font-size: 14px; line-height: 1.6; }
-    .bubble-body { white-space: pre-wrap; word-break: break-word; }
-    .bubble-body.loading { color: #888; }
-    .bubble-foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 8px; color: #999; font-size: 12px; }
-    .bubble-foot button { color: var(--accent); font-size: 12px; }
+    /* the host carries all:initial inline, which beats :host rules, so tokens live on the top-level boxes */
+    :host { --accent: #3f56e0; }
+    .dock, .toast, .sel-icon, .bubble {
+      --surface: #fff; --line: rgba(29, 31, 35, .1); --muted: #6b6f76; --hover: rgba(29, 31, 35, .05);
+      --shadow: 0 4px 16px rgba(20, 22, 26, .12);
+      font: 13px/1.5 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+      color: #1d1f23;
+    }
     @media (prefers-color-scheme: dark) {
-      .ball-wrap, .toast, .bubble { color: #e6e6e6; }
-      .ball, .menu button, .toast, .sel-icon, .bubble { background: #2b2d31; }
-      .menu button { color: #bbb; }
-      .active .ball { background: var(--accent); }
-    }`;
+      .dock, .toast, .sel-icon, .bubble {
+        --surface: #232427; --line: rgba(255, 255, 255, .1); --muted: #9a9ea6; --hover: rgba(255, 255, 255, .06);
+        --shadow: 0 4px 16px rgba(0, 0, 0, .4);
+        color: #e8e9eb;
+      }
+    }
+    [hidden] { display: none !important; }
+    button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    svg { display: block; }
+
+    .dock { position: fixed; right: 12px; transform: translateY(-50%); }
+    .ball {
+      position: relative; width: 40px; height: 40px; border-radius: 20px; display: grid; place-items: center;
+      background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); color: var(--accent);
+      touch-action: none; transition: background-color .15s, color .15s;
+    }
+    .ball:hover { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+    .active .ball { background: var(--accent); border-color: transparent; color: #fff; }
+    .ball::after {
+      content: ''; position: absolute; inset: -4px; border-radius: 50%;
+      border: 2px solid transparent; border-top-color: var(--accent); opacity: 0;
+    }
+    .busy .ball::after { opacity: 1; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .busy .ball::after { animation: none; border-color: var(--accent); opacity: .4; } }
+    .dot {
+      position: absolute; top: 0; right: 0; width: 10px; height: 10px; border-radius: 5px;
+      background: #d4453b; border: 2px solid var(--surface); box-sizing: border-box; display: none;
+    }
+    .failed .dot { display: block; }
+
+    .panel {
+      position: absolute; right: 100%; top: 50%; padding-right: 8px;
+      transform: translate(4px, -50%); opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s;
+    }
+    .dock:hover .panel, .dock:focus-within .panel { opacity: 1; pointer-events: auto; transform: translate(0, -50%); }
+    .panel-inner {
+      width: 192px; padding: 4px; background: var(--surface); border: 1px solid var(--line);
+      border-radius: 12px; box-shadow: var(--shadow);
+    }
+    .status { margin: 0; padding: 6px 8px 4px; font-size: 12px; color: var(--muted); }
+    .row { display: flex; align-items: center; gap: 8px; width: 100%; height: 32px; padding: 0 8px; border-radius: 8px; text-align: left; }
+    .row:hover { background: var(--hover); }
+    .ico { width: 16px; display: grid; place-items: center; color: var(--muted); }
+
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); max-width: min(520px, 92vw);
+      display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 16px;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+    }
+    .toast-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .toast.error .toast-text::before {
+      content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 4px; background: #d4453b;
+    }
+    .toast-action { flex: none; padding: 4px 8px; border-radius: 8px; color: var(--accent); font-weight: 500; }
+    .toast-action:hover, .toast-close:hover { background: var(--hover); }
+    .toast-close { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; color: var(--muted); }
+
+    .sel-icon {
+      position: fixed; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px;
+      background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); color: var(--accent);
+    }
+    .sel-icon:hover { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+    .bubble {
+      position: fixed; width: max-content; min-width: 200px; max-width: min(380px, 90vw); max-height: 50vh; overflow: auto;
+      padding: 12px 16px 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+      box-shadow: var(--shadow); font-size: 14px; line-height: 1.65;
+    }
+    .bubble-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .skel { display: block; height: 10px; margin: 8px 0; border-radius: 5px; background: var(--hover); }
+    .skel.short { width: 60%; }
+    .bubble-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+    .copy { display: flex; align-items: center; gap: 4px; padding: 2px 8px; margin-right: -8px; border-radius: 8px; }
+    .copy:hover { background: var(--hover); color: var(--accent); }
+  `;
 
   init();
 })();

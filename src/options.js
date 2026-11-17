@@ -1,5 +1,8 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+
+const COLORS = ['#3f56e0', '#0e7c86', '#2f8a3e', '#c26a00', '#c2382f', '#8a44c8'];
 
 let settings;
 
@@ -14,84 +17,133 @@ function setPath(obj, path, value) {
 
 function showSection() {
   const id = (location.hash || '#general').slice(1);
-  for (const s of $$('main section')) s.hidden = s.id !== id;
+  for (const s of $$('main .page')) s.hidden = s.id !== id;
   for (const a of $$('nav a')) a.classList.toggle('on', a.hash === `#${id}`);
 }
 addEventListener('hashchange', showSection);
 
-/* ---------- engine panels ---------- */
+/* ---------- translation services ---------- */
 
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+function svcStatus(id) {
+  if (!DUET.ENGINES[id].llm) return ['免费，无需配置', ''];
+  const problem = DUET.engineProblem(settings, id);
+  return problem ? [problem, 'warn'] : ['已配置', ''];
+}
 
-function enginePanel(id, engine) {
+function renderServiceList() {
+  $('#svcList').innerHTML = Object.entries(DUET.ENGINES).map(([id, e]) => {
+    const [text, cls] = svcStatus(id);
+    return `<label><input type="radio" name="engine" value="${id}" data-key="engine"><span class="svc"><b>${esc(e.name)}</b><small class="${cls}">${esc(text)}</small></span></label>`;
+  }).join('');
+}
+
+function renderServicePanel() {
+  const id = settings.engine;
+  const e = DUET.ENGINES[id];
   const k = (f) => `engines.${id}.${f}`;
   const limits = `
-    <div class="field grid3">
-      <label><span>最大并发请求</span><input type="number" min="1" max="50" data-key="${k('concurrency')}"></label>
-      <label><span>每批最多段落</span><input type="number" min="1" max="100" data-key="${k('batchSize')}"></label>
-      <label><span>每批最多字符</span><input type="number" min="200" max="20000" step="100" data-key="${k('batchChars')}"></label>
-    </div>`;
-  if (!engine.llm) {
-    return `<div class="card" data-panel="${id}"><h3>${esc(engine.name)}</h3>
-      <div class="field muted">${esc(engine.desc)}。</div>${limits}</div>`;
+    <label>同时发出的请求数<input type="number" min="1" max="50" data-key="${k('concurrency')}"></label>
+    <label>每次请求最多段落数<input type="number" min="1" max="100" data-key="${k('batchSize')}"></label>
+    <label>每次请求最多字数<input type="number" min="200" max="20000" step="100" data-key="${k('batchChars')}"></label>`;
+  const test = `
+    <div class="test"><button class="btn" id="testBtn">测试</button><span class="test-result" id="testResult">用这个服务翻译一句英文，确认能用</span></div>`;
+
+  if (!e.llm) {
+    $('#svcPanel').innerHTML = `<h3>${esc(e.name)}</h3><p class="desc">${esc(e.desc)}。选中后就能直接使用。</p>${test}
+      <details><summary>请求设置</summary><div class="grid3">${limits}</div></details>`;
+  } else {
+    const presets = id === 'openai'
+      ? `<div class="field"><span>服务商</span><div class="presets">${DUET.OPENAI_PRESETS.map((p, i) =>
+        `<button data-preset="${i}" class="${settings.engines.openai.baseUrl === p.baseUrl ? 'on' : ''}">${esc(p.name)}</button>`).join('')}</div>
+        <span class="hint">点一下自动填入接口地址和推荐模型。本地 Ollama 如果返回 403，需要设置环境变量 <code>OLLAMA_ORIGINS=*</code> 后重启。</span></div>`
+      : '';
+    $('#svcPanel').innerHTML = `<h3>${esc(e.name)}</h3>
+      ${presets}
+      <label class="field"><span>API Key</span>
+        <span class="key"><input type="password" autocomplete="off" spellcheck="false" data-key="${k('apiKey')}" placeholder="${id === 'openai' ? '本地模型可以不填' : ''}">
+        <button class="btn" type="button" id="reveal">显示</button></span>
+        <span class="hint">只保存在这台电脑的浏览器里，翻译时直接发给下面的接口地址</span></label>
+      <label class="field"><span>接口地址</span><input type="url" spellcheck="false" data-key="${k('baseUrl')}"></label>
+      <label class="field"><span>模型</span><input type="text" spellcheck="false" data-key="${k('model')}"></label>
+      ${test}
+      <details><summary>请求设置</summary><div class="grid3">
+        <label>Temperature<input type="text" data-key="${k('temperature')}" placeholder="留空用模型默认值"></label>
+        ${limits}</div>
+        <p class="hint" style="color: var(--muted); font-size: 13px; padding-bottom: 12px">翻译建议 Temperature 设为 0 到 0.3。推理模型（o 系列、GPT-5、DeepSeek-R1）只能留空。</p>
+      </details>
+      <details><summary>提示词</summary>
+        <label class="field" style="padding-top: 0"><textarea data-key="systemPrompt" rows="8" placeholder="${esc(DUET.DEFAULT_SYSTEM_PROMPT)}" aria-label="提示词"></textarea>
+        <span class="hint">留空使用默认提示词，<code>{{to}}</code> 会替换成目标语言。一次翻译多段时，编号规则会自动加上。</span></label>
+      </details>`;
   }
-  const presets = id === 'openai'
-    ? `<div class="field"><span>服务商预设</span><select id="openaiPreset"><option value="">选择后自动填入接口地址和模型…</option>${
-      DUET.OPENAI_PRESETS.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('')}</select>
-      <span class="hint">本地 Ollama 若返回 403，请设置环境变量 <code>OLLAMA_ORIGINS=*</code> 后重启 Ollama。</span></div>`
-    : '';
-  const keyHint = id === 'openai' ? '本地模型可留空' : '';
-  return `<div class="card" data-panel="${id}"><h3>${esc(engine.name)}</h3>${presets}
-    <div class="field"><span>API Key</span><div class="key-wrap">
-      <input type="password" autocomplete="off" spellcheck="false" data-key="${k('apiKey')}" placeholder="${keyHint}">
-      <button class="btn" data-reveal>显示</button></div>
-      <span class="hint">只保存在本机浏览器中，请求直接发往下面的接口地址。</span></div>
-    <div class="field"><span>接口地址</span><input type="url" spellcheck="false" data-key="${k('baseUrl')}"></div>
-    <div class="field"><span>模型</span><input type="text" spellcheck="false" data-key="${k('model')}"></div>
-    <div class="field"><span>Temperature</span><input type="text" data-key="${k('temperature')}" placeholder="留空使用模型默认值">
-      <span class="hint">翻译建议 0–0.3。部分推理模型（如 o 系列、GPT-5）只接受默认值，请留空。</span></div>
-    ${limits}</div>`;
-}
 
-function renderEngines() {
-  $('#engineCards').innerHTML = Object.entries(DUET.ENGINES).map(([id, e]) =>
-    `<label class="engine-card"><input type="radio" name="engine" value="${id}" data-key="engine"><b>${esc(e.name)}</b><small>${esc(e.desc)}</small></label>`).join('');
-  $('#enginePanels').innerHTML = Object.entries(DUET.ENGINES).map(([id, e]) => enginePanel(id, e)).join('');
-
-  $('#openaiPreset').addEventListener('change', (e) => {
-    const p = DUET.OPENAI_PRESETS[e.target.value];
-    if (!p) return;
-    settings.engines.openai.baseUrl = p.baseUrl;
-    settings.engines.openai.model = p.model;
-    fillFields();
-    persist();
-    e.target.value = '';
-  });
-  for (const b of $$('[data-reveal]')) {
+  for (const b of $$('[data-preset]')) {
     b.addEventListener('click', () => {
-      const input = b.previousElementSibling;
-      input.type = input.type === 'password' ? 'text' : 'password';
-      b.textContent = input.type === 'password' ? '显示' : '隐藏';
+      const p = DUET.OPENAI_PRESETS[b.dataset.preset];
+      settings.engines.openai.baseUrl = p.baseUrl;
+      settings.engines.openai.model = p.model;
+      persist();
+      renderServicePanel();
+      renderServiceList();
+      fillFields();
     });
   }
+  $('#reveal')?.addEventListener('click', (ev) => {
+    const input = ev.currentTarget.previousElementSibling;
+    input.type = input.type === 'password' ? 'text' : 'password';
+    ev.currentTarget.textContent = input.type === 'password' ? '显示' : '隐藏';
+  });
+  $('#testBtn').addEventListener('click', runTest);
 }
 
-function updateEngineVisibility() {
-  for (const p of $$('[data-panel]')) p.hidden = p.dataset.panel !== settings.engine;
-  $('#promptCard').hidden = !DUET.ENGINES[settings.engine].llm;
+async function runTest() {
+  const out = $('#testResult');
+  const btn = $('#testBtn');
+  out.className = 'test-result';
+  out.textContent = '正在请求…';
+  btn.disabled = true;
+  clearTimeout(saveTimer);
+  await chrome.storage.local.set({ settings });
+  const started = performance.now();
+  const res = await chrome.runtime.sendMessage({
+    type: 'translate', texts: ['Hello! This is a quick test of the translation service.'], to: settings.targetLang, noCache: true,
+  });
+  const ms = Math.round(performance.now() - started);
+  btn.disabled = false;
+  if (res?.ok) { out.className = 'test-result ok'; out.textContent = `${res.data[0]}（${ms} 毫秒）`; }
+  else { out.className = 'test-result err'; out.textContent = res?.error || '没有返回结果'; }
+}
+
+/* ---------- appearance ---------- */
+
+function renderAppearance() {
+  $('#styleChips').innerHTML = DUET.STYLES.map(([value, name]) =>
+    `<label title="${name}"><input type="radio" name="style" value="${value}" data-key="style"><span class="chip" data-duet-style="${value}"><font class="duet-block"><font class="duet-inner">${name}</font></font></span></label>`).join('');
+  $('#swatches').innerHTML = COLORS.map((c) =>
+    `<label title="${c}"><input type="radio" name="color" value="${c}" data-key="color"><span class="sw" style="background:${c}"></span></label>`).join('')
+    + '<input type="color" data-key="color" title="自定义颜色" aria-label="自定义颜色">';
+}
+
+function applyPreview() {
+  const preview = $('#preview');
+  preview.dataset.duetStyle = settings.style;
+  preview.dataset.display = settings.displayMode;
+  document.documentElement.style.setProperty('--duet-color', settings.color);
+  document.documentElement.style.setProperty('--accent', settings.color);
 }
 
 /* ---------- generic field binding ---------- */
 
 function fillFields() {
   for (const el of $$('[data-key]')) {
+    // re-filling the field being typed in would move its caret
+    if (el === document.activeElement && el.type !== 'radio' && el.type !== 'checkbox') continue;
     const v = getPath(settings, el.dataset.key);
     if (el.type === 'checkbox') el.checked = !!v;
     else if (el.type === 'radio') el.checked = el.value === v;
     else if (el.hasAttribute('data-list')) el.value = (v || []).join('\n');
     else el.value = v ?? '';
   }
-  updateEngineVisibility();
   applyPreview();
 }
 
@@ -107,8 +159,11 @@ function persist() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     await chrome.storage.local.set({ settings });
-    $('#saved').classList.add('show');
-    setTimeout(() => $('#saved').classList.remove('show'), 1200);
+    for (const f of $$('.saved-flag')) {
+      f.textContent = '已自动保存';
+      f.classList.add('show');
+      setTimeout(() => f.classList.remove('show'), 1500);
+    }
   }, 300);
 }
 
@@ -116,37 +171,18 @@ document.addEventListener('input', (e) => {
   const el = e.target.closest?.('[data-key]');
   if (!el || (el.type === 'radio' && !el.checked)) return;
   if (el.type === 'number' && el.value === '') return;
-  setPath(settings, el.dataset.key, readField(el));
-  if (el.dataset.key === 'engine') updateEngineVisibility();
+  const key = el.dataset.key;
+  setPath(settings, key, readField(el));
+  if (key === 'engine') renderServicePanel();
+  if (key === 'engine' || key.startsWith('engines.')) renderServiceList();
+  if (key === 'color' || key === 'engine' || key.startsWith('engines.')) fillFields();
   applyPreview();
   persist();
 });
 
-function applyPreview() {
-  document.documentElement.setAttribute('data-duet-style', settings.style);
-  document.documentElement.style.setProperty('--duet-color', settings.color);
-  document.documentElement.style.setProperty('--accent', settings.color);
-}
-
 /* ---------- actions ---------- */
 
-$('#testBtn').addEventListener('click', async () => {
-  const out = $('#testResult');
-  out.className = 'muted';
-  out.textContent = '测试中…';
-  clearTimeout(saveTimer);
-  await chrome.storage.local.set({ settings });
-  const started = performance.now();
-  const res = await chrome.runtime.sendMessage({
-    type: 'translate', texts: ['Hello! This is a quick test of the translation service.'], to: settings.targetLang, noCache: true,
-  });
-  const ms = Math.round(performance.now() - started);
-  if (res?.ok) { out.className = ''; out.textContent = `✓ ${res.data[0]}（${ms} ms）`; }
-  else { out.className = 'error'; out.textContent = `✗ ${res?.error || '未知错误'}`; }
-});
-
-$('#shortcuts').addEventListener('click', (e) => {
-  e.preventDefault();
+$('#shortcuts').addEventListener('click', () => {
   const firefox = navigator.userAgent.includes('Firefox');
   chrome.tabs.create({ url: firefox ? 'about:addons' : 'chrome://extensions/shortcuts' });
 });
@@ -165,7 +201,7 @@ $('#importFile').addEventListener('change', async (e) => {
   try {
     settings = DUET.merge(DUET.DEFAULTS, JSON.parse(await file.text()));
     await chrome.storage.local.set({ settings });
-    fillFields();
+    refreshAll();
     alert('设置已导入');
   } catch (err) {
     alert(`导入失败：${err.message}`);
@@ -179,20 +215,24 @@ $('#clearCacheBtn').addEventListener('click', async () => {
 });
 
 $('#resetBtn').addEventListener('click', async () => {
-  if (!confirm('恢复默认设置？已填写的 API Key 也会被清除。')) return;
+  if (!confirm('恢复默认设置？填写过的 API Key 也会被清除。')) return;
   settings = structuredClone(DUET.DEFAULTS);
   await chrome.storage.local.set({ settings });
-  fillFields();
+  refreshAll();
 });
 
 /* ---------- init ---------- */
 
+function refreshAll() {
+  renderServiceList();
+  renderServicePanel();
+  fillFields();
+}
+
 (async () => {
   settings = await DUET.loadSettings();
   for (const sel of $$('[data-langs]')) sel.replaceChildren(...DUET.LANGUAGES.map(([c, n]) => new Option(n, c)));
-  $('#styleSelect').replaceChildren(...DUET.STYLES.map(([v, n]) => new Option(n, v)));
-  $('#systemPrompt').placeholder = DUET.DEFAULT_SYSTEM_PROMPT;
-  renderEngines();
-  fillFields();
+  renderAppearance();
+  refreshAll();
   showSection();
 })();

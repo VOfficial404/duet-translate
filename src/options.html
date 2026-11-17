@@ -4,143 +4,196 @@
   <meta charset="utf-8">
   <title>Duet Translate 设置</title>
   <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="content.css">
   <style>
     body { display: flex; min-height: 100vh; }
-    nav { width: 210px; flex: none; padding: 22px 12px; border-right: 1px solid var(--border); background: var(--card); position: sticky; top: 0; height: 100vh; }
-    nav .brand { display: flex; align-items: center; gap: 8px; padding: 0 10px 18px; font-weight: 600; font-size: 16px; }
-    nav .brand img { width: 26px; height: 26px; }
-    nav a { display: block; padding: 8px 12px; border-radius: 8px; color: inherit; }
-    nav a:hover { background: var(--bg); }
-    nav a.on { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); font-weight: 600; }
-    main { flex: 1; max-width: 820px; padding: 28px 36px 80px; }
-    section[hidden] { display: none; }
-    section h2 { font-size: 20px; margin-bottom: 14px; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 4px 18px; margin-bottom: 18px; }
-    .card h3 { font-size: 14px; padding: 12px 0 4px; }
-    .engines { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-bottom: 18px; }
-    .engine-card { display: block; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); cursor: pointer; }
-    .engine-card input { display: none; }
-    .engine-card b { display: block; }
-    .engine-card small { color: var(--muted); }
-    .engine-card:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-    .field { padding: 10px 0; }
-    .field + .field { border-top: 1px solid var(--border); }
-    .field > span { display: block; margin-bottom: 6px; }
-    .field .hint { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
-    .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-    .key-wrap { display: flex; gap: 8px; }
-    .test { display: flex; gap: 10px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--border); }
-    #testResult { flex: 1; white-space: pre-wrap; word-break: break-word; font-size: 13px; }
-    #testResult.error { color: var(--danger); }
-    #saved { position: fixed; right: 24px; bottom: 20px; padding: 6px 14px; border-radius: 8px; background: var(--accent); color: #fff; opacity: 0; transition: opacity .2s; }
-    #saved.show { opacity: 1; }
-    .preview { padding: 12px 0; line-height: 1.7; }
-    .actions { display: flex; gap: 10px; flex-wrap: wrap; padding: 12px 0; }
-    kbd { padding: 1px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; font-size: 12px; }
+    nav { position: sticky; top: 0; flex: none; width: 232px; height: 100vh; padding: 20px 12px; border-right: 1px solid var(--line); background: var(--sunken); }
+    nav .brand { display: flex; align-items: center; gap: 8px; padding: 0 8px 20px; font-weight: 600; font-size: 15px; }
+    nav .brand img { width: 24px; height: 24px; }
+    nav a { display: flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 8px; color: var(--fg-2); }
+    nav a:hover { background: var(--hover); color: var(--fg); text-decoration: none; }
+    nav a.on { background: var(--bg); color: var(--fg); font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+    nav a + a { margin-top: 2px; }
+
+    main { flex: 1; min-width: 0; padding: 32px 48px 96px; }
+    .page { max-width: 720px; }
+    .page-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; }
+    .page-head h1 { font-size: 22px; }
+    .saved-flag { font-size: 13px; color: var(--muted); opacity: 0; transition: opacity 0.2s var(--ease); }
+    .saved-flag.show { opacity: 1; }
+    .group { margin-bottom: 32px; }
+    .group > h2 { margin-bottom: 8px; font-size: 14px; font-weight: 600; color: var(--fg-2); }
+    .box { border: 1px solid var(--line); border-radius: 12px; padding: 0 20px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 56px; padding: 12px 0; }
+    .row + .row { border-top: 1px solid var(--line); }
+    .row .text { flex: 1; min-width: 0; }
+    .row .hint { display: block; margin-top: 2px; font-size: 13px; color: var(--muted); }
+    .row > select, .row > input[type='text'] { width: 200px; flex: none; }
+    .row.stack { flex-direction: column; align-items: stretch; gap: 8px; }
+    .field { display: grid; gap: 6px; padding: 12px 0; }
+    .field + .field { border-top: 1px solid var(--line); }
+    .field > span { font-weight: 500; }
+    .field .hint { font-size: 13px; color: var(--muted); }
+
+    .preview-lg { font-size: 15px; padding: 16px 20px; margin: 16px 0 4px; }
+    .swatches { display: flex; align-items: center; gap: 8px; }
+    .swatches label { position: relative; }
+    .swatches input[type='radio'] { position: absolute; opacity: 0; pointer-events: none; }
+    .swatches .sw { display: block; width: 24px; height: 24px; border-radius: 12px; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
+    .swatches input:checked + .sw { outline: 2px solid var(--fg); outline-offset: 2px; }
+    .swatches input:focus-visible + .sw { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .swatches input[type='color'] { width: 28px; height: 28px; padding: 0; border: 0; background: none; cursor: pointer; }
+
+    /* translation services: list on the left, settings of the selected one on the right */
+    .services { display: grid; grid-template-columns: 220px 1fr; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    .svc-list { padding: 8px; border-right: 1px solid var(--line); background: var(--sunken); }
+    .svc-list label { display: block; position: relative; }
+    .svc-list input { position: absolute; opacity: 0; pointer-events: none; }
+    .svc { display: block; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+    .svc:hover { background: var(--hover); }
+    .svc b { display: block; font-weight: 500; }
+    .svc small { color: var(--muted); font-size: 12px; }
+    .svc small.warn { color: var(--danger); }
+    .svc-list input:checked + .svc { background: var(--bg); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+    .svc-list input:focus-visible + .svc { outline: 2px solid var(--accent); }
+    .svc-panel { padding: 8px 24px 20px; min-width: 0; }
+    .svc-panel h3 { padding: 12px 0 4px; font-size: 16px; }
+    .svc-panel .desc { color: var(--muted); font-size: 13px; padding-bottom: 8px; }
+    .presets { display: flex; flex-wrap: wrap; gap: 4px; }
+    .presets button { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg-2); font: inherit; font-size: 13px; cursor: pointer; }
+    .presets button:hover { background: var(--hover); color: var(--fg); }
+    .presets button.on { border-color: var(--accent); color: var(--accent); }
+    .key { display: flex; gap: 8px; }
+    .test { display: flex; align-items: center; gap: 12px; padding: 16px 0 4px; border-top: 1px solid var(--line); }
+    .test-result { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+    .test-result.ok { color: var(--fg); }
+    .test-result.err { color: var(--danger); }
+    details { border-top: 1px solid var(--line); }
+    details summary { padding: 12px 0; color: var(--fg-2); font-weight: 500; cursor: pointer; }
+    details summary:hover { color: var(--fg); }
+    .grid3 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 16px; padding-bottom: 12px; }
+    .grid3 label { display: grid; gap: 6px; font-size: 13px; color: var(--fg-2); }
+
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 0; }
+    .danger-text { color: var(--danger); }
   </style>
-  <link rel="stylesheet" href="content.css">
 </head>
 <body>
-  <nav>
+  <nav aria-label="设置分类">
     <div class="brand"><img src="../icons/icon-48.png" alt="">Duet Translate</div>
-    <a href="#general" class="on">基本设置</a>
+    <a href="#general">常规</a>
     <a href="#engine">翻译服务</a>
-    <a href="#interaction">交互</a>
+    <a href="#interaction">网页里的操作</a>
     <a href="#sites">网站规则</a>
     <a href="#advanced">高级</a>
   </nav>
 
   <main>
-    <section id="general">
-      <h2>基本设置</h2>
-      <div class="card">
-        <div class="row"><span class="label">目标语言</span><select data-key="targetLang" data-langs></select></div>
-        <div class="row"><span class="label">显示方式</span>
-          <select data-key="displayMode"><option value="bilingual">双语对照</option><option value="translation">仅显示译文</option></select></div>
-        <div class="row"><span class="label">自动翻译<span class="hint">打开网页时，若页面语言不是目标语言则自动翻译</span></span>
-          <label class="switch"><input type="checkbox" data-key="autoTranslate"><span></span></label></div>
+    <section class="page" id="general">
+      <div class="page-head"><h1>常规</h1><span class="saved-flag"></span></div>
+      <div class="group">
+        <h2>翻译</h2>
+        <div class="box">
+          <div class="row"><span class="text">翻译成</span><select data-key="targetLang" data-langs></select></div>
+          <div class="row"><span class="text">打开外语网页时自动翻译<span class="hint">页面语言和上面的语言不同时，不用点按钮就开始翻译</span></span>
+            <label class="switch"><input type="checkbox" data-key="autoTranslate"><span></span></label></div>
+        </div>
       </div>
-      <div class="card">
-        <h3>译文样式</h3>
-        <div class="row"><span class="label">样式</span><select data-key="style" id="styleSelect"></select></div>
-        <div class="row"><span class="label">主题色</span><input type="color" data-key="color"></div>
-        <div class="preview" id="preview">
-          The quick brown fox jumps over the lazy dog, then keeps running through the forest.
-          <font class="duet-wrapper duet-block"><font class="duet-inner">敏捷的棕色狐狸跳过了那只懒狗，然后继续穿过森林奔跑。</font></font>
+      <div class="group">
+        <h2>译文外观</h2>
+        <div class="box">
+          <div class="preview preview-lg" id="preview">
+            <span class="orig">Reading two languages side by side slows you down in a good way. You notice structure, idioms and the small choices a translator makes.</span>
+            <font class="duet-wrapper duet-block"><font class="duet-inner">并排阅读两种语言，会让你以一种好的方式慢下来。你会注意到句子结构、习语，以及译者做出的那些细小选择。</font></font>
+          </div>
+          <div class="row"><span class="text">显示</span>
+            <div class="seg" role="radiogroup" aria-label="显示">
+              <label><input type="radio" name="displayMode" value="bilingual" data-key="displayMode"><span>双语对照</span></label>
+              <label><input type="radio" name="displayMode" value="translation" data-key="displayMode"><span>只看译文</span></label>
+            </div>
+          </div>
+          <div class="row stack"><span class="text">译文样式</span><div class="chips" id="styleChips" role="radiogroup" aria-label="译文样式"></div></div>
+          <div class="row"><span class="text">强调色<span class="hint">用于下划线、高亮等样式</span></span>
+            <div class="swatches" id="swatches"></div></div>
         </div>
       </div>
     </section>
 
-    <section id="engine" hidden>
-      <h2>翻译服务</h2>
-      <div class="engines" id="engineCards"></div>
-      <div id="enginePanels"></div>
-      <div class="card">
-        <div class="test">
-          <button class="btn primary" id="testBtn">测试当前服务</button>
-          <div id="testResult" class="muted">会用当前选中的服务翻译一句英文。</div>
+    <section class="page" id="engine" hidden>
+      <div class="page-head"><h1>翻译服务</h1><span class="saved-flag"></span></div>
+      <div class="services">
+        <div class="svc-list" id="svcList" role="radiogroup" aria-label="翻译服务"></div>
+        <div class="svc-panel" id="svcPanel"></div>
+      </div>
+    </section>
+
+    <section class="page" id="interaction" hidden>
+      <div class="page-head"><h1>网页里的操作</h1><span class="saved-flag"></span></div>
+      <div class="group">
+        <div class="box">
+          <div class="row"><span class="text">悬浮按钮<span class="hint">网页右侧的翻译按钮，可以上下拖动</span></span>
+            <label class="switch"><input type="checkbox" data-key="floatBall"><span></span></label></div>
+          <div class="row"><span class="text">悬停翻译<span class="hint">鼠标停在段落上，按一下这个键就翻译这一段，再按一次撤销</span></span>
+            <div class="seg" role="radiogroup" aria-label="悬停翻译按键">
+              <label><input type="radio" name="hoverKey" value="Control" data-key="hoverKey"><span>Ctrl</span></label>
+              <label><input type="radio" name="hoverKey" value="Alt" data-key="hoverKey"><span>Alt</span></label>
+              <label><input type="radio" name="hoverKey" value="Shift" data-key="hoverKey"><span>Shift</span></label>
+              <label><input type="radio" name="hoverKey" value="off" data-key="hoverKey"><span>关闭</span></label>
+            </div>
+          </div>
+          <div class="row"><span class="text">划词翻译<span class="hint">选中文字后，旁边会出现翻译按钮</span></span>
+            <label class="switch"><input type="checkbox" data-key="selectionTranslate"><span></span></label></div>
+          <div class="row"><span class="text">输入框翻译<span class="hint">在输入框里快速连按三次空格，把内容替换成右边的语言</span></span>
+            <label class="switch"><input type="checkbox" data-key="inputTranslate"><span></span></label></div>
+          <div class="row"><span class="text">输入框翻译成<span class="hint">选中的文字已经是你的语言时，划词翻译也会翻译成这个语言</span></span>
+            <select data-key="inputTargetLang" data-langs></select></div>
         </div>
       </div>
-      <div class="card" id="promptCard">
-        <h3>AI 翻译提示词（System Prompt）</h3>
-        <div class="field">
-          <textarea data-key="systemPrompt" rows="8" id="systemPrompt"></textarea>
-          <span class="hint">留空使用默认提示词。<code>{{to}}</code> 会被替换为目标语言的英文名。批量翻译时会自动附加段落编号规则，无需在这里说明。</span>
+      <div class="group">
+        <h2>快捷键</h2>
+        <div class="box">
+          <div class="row"><span class="text">翻译此页 / 显示原文</span><span><kbd>Alt</kbd> <kbd>A</kbd></span></div>
+          <div class="row"><span class="text">切换双语对照 / 只看译文</span><span><kbd>Alt</kbd> <kbd>S</kbd></span></div>
+          <div class="row"><span class="text hint">快捷键在浏览器的扩展快捷键页面修改</span><button class="btn" id="shortcuts">修改快捷键</button></div>
         </div>
       </div>
     </section>
 
-    <section id="interaction" hidden>
-      <h2>交互</h2>
-      <div class="card">
-        <div class="row"><span class="label">显示悬浮球<span class="hint">页面右侧的翻译按钮，可上下拖动</span></span>
-          <label class="switch"><input type="checkbox" data-key="floatBall"><span></span></label></div>
-        <div class="row"><span class="label">鼠标悬停翻译<span class="hint">鼠标停在段落上，按下并松开该键即可翻译 / 撤销该段</span></span>
-          <select data-key="hoverKey"><option value="Control">Ctrl</option><option value="Alt">Alt</option><option value="Shift">Shift</option><option value="off">关闭</option></select></div>
-        <div class="row"><span class="label">划词翻译<span class="hint">选中文字后显示翻译按钮</span></span>
-          <label class="switch"><input type="checkbox" data-key="selectionTranslate"><span></span></label></div>
-        <div class="row"><span class="label">输入框翻译<span class="hint">在输入框中快速连按三次空格，把内容翻译成下面的语言</span></span>
-          <label class="switch"><input type="checkbox" data-key="inputTranslate"><span></span></label></div>
-        <div class="row"><span class="label">输入框翻译目标语言<span class="hint">划词翻译的内容已是目标语言时，也会翻译成这个语言</span></span><select data-key="inputTargetLang" data-langs></select></div>
-      </div>
-      <div class="card">
-        <h3>快捷键</h3>
-        <div class="row"><span class="label">翻译 / 显示原文</span><span><kbd>Alt</kbd> + <kbd>A</kbd></span></div>
-        <div class="row"><span class="label">切换 双语 / 仅译文</span><span><kbd>Alt</kbd> + <kbd>S</kbd></span></div>
-        <div class="row"><span class="muted">在 <a href="#" id="shortcuts">浏览器扩展快捷键页面</a> 中修改</span></div>
-      </div>
-    </section>
-
-    <section id="sites" hidden>
-      <h2>网站规则</h2>
-      <div class="card">
-        <div class="field"><span>总是翻译这些网站（每行一个域名，包含子域名）</span>
-          <textarea data-key="alwaysSites" data-list rows="6" placeholder="news.ycombinator.com"></textarea></div>
-        <div class="field"><span>从不翻译这些网站</span>
-          <textarea data-key="neverSites" data-list rows="6" placeholder="bilibili.com"></textarea></div>
-      </div>
-    </section>
-
-    <section id="advanced" hidden>
-      <h2>高级</h2>
-      <div class="card">
-        <div class="field"><span>自定义 CSS（注入到每个网页）</span>
-          <textarea data-key="customCss" rows="6" placeholder=".duet-inner { color: #666; }"></textarea>
-          <span class="hint">译文元素：<code>.duet-wrapper</code>（容器）、<code>.duet-inner</code>（译文文本）。</span></div>
-      </div>
-      <div class="card">
-        <div class="actions">
-          <button class="btn" id="exportBtn">导出设置</button>
-          <button class="btn" id="importBtn">导入设置</button>
-          <button class="btn" id="clearCacheBtn">清除翻译缓存</button>
-          <button class="btn" id="resetBtn">恢复默认设置</button>
-          <input type="file" id="importFile" accept="application/json" hidden>
+    <section class="page" id="sites" hidden>
+      <div class="page-head"><h1>网站规则</h1><span class="saved-flag"></span></div>
+      <p class="hint" style="color: var(--muted); margin: -12px 0 16px">每行一个域名，子域名也会生效。也可以在工具栏弹窗里直接设置当前网站。</p>
+      <div class="group">
+        <div class="box">
+          <label class="field"><span>总是翻译</span><textarea data-key="alwaysSites" data-list rows="6" placeholder="news.ycombinator.com"></textarea></label>
+          <label class="field"><span>从不翻译</span><textarea data-key="neverSites" data-list rows="6" placeholder="bilibili.com"></textarea></label>
         </div>
-        <span class="hint muted" style="display:block;padding-bottom:12px">导出的文件包含 API Key，请妥善保管。</span>
+      </div>
+    </section>
+
+    <section class="page" id="advanced" hidden>
+      <div class="page-head"><h1>高级</h1><span class="saved-flag"></span></div>
+      <div class="group">
+        <h2>自定义 CSS</h2>
+        <div class="box">
+          <label class="field"><textarea data-key="customCss" rows="6" placeholder=".duet-inner { color: #555; }" aria-label="自定义 CSS"></textarea>
+            <span class="hint">会注入到每个网页。译文容器是 <code>.duet-wrapper</code>，译文文字是 <code>.duet-inner</code>。</span></label>
+        </div>
+      </div>
+      <div class="group">
+        <h2>数据</h2>
+        <div class="box">
+          <div class="actions">
+            <button class="btn" id="exportBtn">导出设置</button>
+            <button class="btn" id="importBtn">导入设置</button>
+            <button class="btn" id="clearCacheBtn">清除翻译缓存</button>
+            <button class="btn quiet danger-text" id="resetBtn">恢复默认设置</button>
+            <input type="file" id="importFile" accept="application/json" hidden>
+          </div>
+          <p class="hint" style="color: var(--muted); font-size: 13px; padding-bottom: 16px">导出的文件里包含 API Key，不要分享给别人。</p>
+        </div>
       </div>
     </section>
   </main>
-  <div id="saved">已保存</div>
 
   <script src="defaults.js"></script>
   <script src="options.js"></script>

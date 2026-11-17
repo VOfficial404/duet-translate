@@ -80,8 +80,14 @@ async function request(url, init, { timeout = 60000, retries = 2 } = {}) {
       await sleep(after > 0 ? Math.min(after, 20) * 1000 : 1000 * 2 ** attempt);
       continue;
     }
-    const body = (await res.text().catch(() => '')).slice(0, 300);
-    throw new Error(`HTTP ${res.status}${body ? `：${body}` : ''}`);
+    const raw = await res.text().catch(() => '');
+    let detail = raw;
+    try {
+      const j = JSON.parse(raw);
+      detail = j.error?.message || j.message || (typeof j.error === 'string' ? j.error : '') || raw;
+    } catch { /* not JSON: keep the raw text */ }
+    const hint = { 401: 'API Key 无效', 403: '没有访问权限', 404: '接口地址或模型名不存在', 429: '请求太频繁或额度已用完' }[res.status];
+    throw new Error(`${[hint, detail.trim().slice(0, 200)].filter(Boolean).join('：')}（HTTP ${res.status}）`);
   }
 }
 
@@ -187,8 +193,8 @@ async function chatGemini(cfg, system, user) {
 const CHAT = { openai: chatOpenAI, claude: chatClaude, gemini: chatGemini };
 
 async function translateLLM(engine, cfg, settings, texts, to) {
-  if (engine !== 'openai' && !cfg.apiKey) throw new Error(`未配置 ${DUET.ENGINES[engine].name} 的 API Key`);
-  if (!cfg.model) throw new Error('未配置模型名称');
+  const problem = DUET.engineProblem(settings, engine);
+  if (problem) throw new Error(`${DUET.ENGINES[engine].name} ${problem}，请在设置中填写`);
   const chat = (list) => limiterFor(engine).run(cfg.concurrency, async () =>
     stripThinking(await CHAT[engine](cfg, systemPrompt(settings, to), userPrompt(list, to))));
 

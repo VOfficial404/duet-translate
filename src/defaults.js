@@ -73,7 +73,7 @@ var DUET = (() => {
     engine: 'microsoft',
     displayMode: 'bilingual', // 'bilingual' | 'translation'
     style: 'none',
-    color: '#4f6ef7',
+    color: '#3f56e0',
     floatBall: true,
     ballTop: 62, // percent of viewport height
     hoverKey: 'Control', // 'Control' | 'Alt' | 'Shift' | 'off'
@@ -124,8 +124,18 @@ var DUET = (() => {
     });
   }
 
+  // Why the engine can't translate yet, or '' when it is ready. Mirrors the checks in background.js.
+  function engineProblem(settings, id = settings.engine) {
+    const cfg = settings.engines[id];
+    if (!ENGINES[id]?.llm) return '';
+    if (!cfg.baseUrl?.trim()) return '未填写接口地址';
+    if (!cfg.model?.trim()) return '未填写模型';
+    if (id !== 'openai' && !cfg.apiKey?.trim()) return '未填写 API Key';
+    return '';
+  }
+
   return {
     LANGUAGES, ENGINES, OPENAI_PRESETS, STYLES, DEFAULTS, DEFAULT_SYSTEM_PROMPT,
-    merge, loadSettings, saveSettings, langName, hostMatches,
+    merge, loadSettings, saveSettings, langName, hostMatches, engineProblem,
   };
 })();
