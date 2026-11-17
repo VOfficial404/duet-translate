@@ -47,13 +47,15 @@
 
 **Edge 扩展商店**：审核中，上架后会在这里放链接。
 
-**手动安装（Chrome / Edge）**
+**安装包（Chrome / Edge）**：适合进不了扩展商店，或者想直接下载安装的用户。
 
-1. 下载代码：在本页点 **Code → Download ZIP** 后解压，或者运行 `git clone https://github.com/VOfficial404/duet-translate.git`
+1. 在 [Releases](https://github.com/VOfficial404/duet-translate/releases/latest) 页面下载 `duet-translate-x.y.z-chromium.zip`，并解压到一个**固定位置**的文件夹
 2. 打开 `chrome://extensions` 或 `edge://extensions`，开启 **开发者模式**
-3. 点 **加载已解压的扩展程序**，选择仓库根目录
+3. 点 **加载已解压的扩展程序**，选择刚才解压出来的文件夹
 
-**Firefox 121+**：在 `about:debugging` 里点 **临时载入附加组件**，选择仓库里的 `manifest.json`，然后在扩展的权限设置里允许它访问所有网站。
+浏览器每次启动都会从这个文件夹加载扩展，所以装好后不要删除或移动它。更新时用新版本的文件覆盖进去，然后在扩展页点 **重新加载**。Chrome 和 Edge 不允许从商店以外的地方直接安装 `.crx` 文件，所以只能这样加载。
+
+**Firefox 121+**：在 Releases 页面下载 `duet-translate-x.y.z-firefox.zip`，打开 `about:debugging#/runtime/this-firefox`，点 **临时载入附加组件** 并选择这个 zip，然后在扩展的权限设置里允许它访问所有网站。临时载入的扩展在 Firefox 重启后会被移除。
 
 ## 使用
 
@@ -77,8 +79,10 @@
 src/background.js   翻译服务、批量解析、并发、重试、缓存
 src/content.js      段落识别、懒加载、译文渲染、悬停/划词/输入框翻译、悬浮球
 src/options.*       设置页      src/popup.*   工具栏弹窗
-scripts/pack.ts     打包商店 zip（bun scripts/pack.ts → dist/）
+scripts/pack.ts     打包 zip（bun scripts/pack.ts → dist/）
 ```
+
+**发布新版本**：修改 `manifest.json` 里的 `version`，提交后推送对应的标签（如 `git tag v0.2.0 && git push origin v0.2.0`）。GitHub Actions 会自动打包，并把 Chrome/Edge 和 Firefox 两个安装包发布到 Releases。
 
 还没做的功能：PDF / EPUB、视频字幕、移动端。欢迎提 PR。
 
